@@ -1,35 +1,42 @@
 import Board from "../models/board.model.js";
 import User from "../models/user.model.js";
+import Column from "../models/column.model.js";
+import Task from "../models/task.model.js";
+import mongoose from "mongoose";
 
 // Create a new board
 const createBoard = async (req, res) => {
   try {
-    const { name, members } = req.body;
+    const { name, description, members } = req.body;
 
     // Validate input
     if (!name) {
       return res.status(400).json({ message: "Board name is required." });
     }
 
-    // Create the new board
+    // Create the new board with description
     const newBoard = new Board({
       name,
+      description: description || "", // Ensure description is properly set
       createdBy: req.user.id, // Assuming `req.user.id` is set by the authentication middleware
       members: members ? [req.user.id, ...members] : [req.user.id],
     });
 
     await newBoard.save();
 
-        // Update the user's boards array
-        const user = await User.findById(req.user.id);
-        if (!user) {
-          return res.status(404).json({ message: "User not found." });
-        }
-    
-        user.boards.push(newBoard._id);
-        await user.save();
-    
-    res.status(201).json({ message: "Board created successfully.", board: newBoard });
+    // Update the user's boards array
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    user.boards.push(newBoard._id);
+    await user.save();
+
+    res.status(201).json({
+      message: "Board created successfully.",
+      board: newBoard,
+    });
   } catch (error) {
     console.error("Error creating board:", error.message);
     res.status(500).json({ message: "Failed to create board.", error: error.message });
@@ -39,11 +46,8 @@ const createBoard = async (req, res) => {
 // Get all boards for the logged-in user
 const getBoards = async (req, res) => {
   try {
-    const boards = await Board.find({ 
-      $or: [
-        { createdBy: req.user.id }, 
-        { members: req.user.id }
-      ] 
+    const boards = await Board.find({
+      $or: [{ createdBy: req.user.id }, { members: req.user.id }],
     }).populate("createdBy members columns");
 
     res.status(200).json({ boards });
@@ -58,15 +62,25 @@ const getBoardById = async (req, res) => {
   try {
     const { id } = req.params;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid board ID" });
+    }
+
     const board = await Board.findById(id).populate("createdBy members columns");
     if (!board) {
       return res.status(404).json({ message: "Board not found." });
     }
 
-    // Check if the user has access to this board
+    console.log("Logged-in User ID:", req.user.id);
+    console.log("Board Created By:", board.createdBy);
+    console.log("Board Members:", board.members);
+
+    // Fix the ObjectId comparison issue
     if (
-      board.createdBy.toString() !== req.user.id &&
-      !board.members.includes(req.user.id)
+      !board.createdBy.equals(new mongoose.Types.ObjectId(req.user.id)) &&
+      !board.members.some((member) =>
+        member._id.equals(new mongoose.Types.ObjectId(req.user.id))
+      )
     ) {
       return res.status(403).json({ message: "Access denied." });
     }
@@ -74,7 +88,9 @@ const getBoardById = async (req, res) => {
     res.status(200).json({ board });
   } catch (error) {
     console.error("Error retrieving board:", error.message);
-    res.status(500).json({ message: "Failed to retrieve board.", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to retrieve board.", error: error.message });
   }
 };
 
@@ -82,7 +98,11 @@ const getBoardById = async (req, res) => {
 const updateBoard = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, members } = req.body;
+    const { name, description, members } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid board ID" });
+    }
 
     const board = await Board.findById(id);
     if (!board) {
@@ -90,16 +110,21 @@ const updateBoard = async (req, res) => {
     }
 
     // Check if the user is the creator of the board
-    if (board.createdBy.toString() !== req.user.id) {
+    if (!board.createdBy.equals(new mongoose.Types.ObjectId(req.user.id))) {
       return res.status(403).json({ message: "Only the creator can update the board." });
     }
 
     // Update fields
     if (name) board.name = name;
+    if (description !== undefined) board.description = description; // Allow empty descriptions
     if (members) board.members = members;
 
     await board.save();
-    res.status(200).json({ message: "Board updated successfully.", board });
+
+    res.status(200).json({
+      message: "Board updated successfully.",
+      board,
+    });
   } catch (error) {
     console.error("Error updating board:", error.message);
     res.status(500).json({ message: "Failed to update board.", error: error.message });
@@ -111,14 +136,29 @@ const deleteBoard = async (req, res) => {
   try {
     const { id } = req.params;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid board ID" });
+    }
+
     const board = await Board.findById(id);
     if (!board) {
       return res.status(404).json({ message: "Board not found." });
     }
 
     // Check if the user is the creator of the board
-    if (board.createdBy.toString() !== req.user.id) {
+    if (!board.createdBy.equals(new mongoose.Types.ObjectId(req.user.id))) {
       return res.status(403).json({ message: "Only the creator can delete the board." });
+    }
+
+     // Find and delete all columns related to this board
+    const columns = await Column.find({ boardId: id });
+
+    for (const column of columns) {
+      // Delete all tasks related to this column
+      await Task.deleteMany({ columnId: column._id });
+
+      // Delete the column itself
+      await column.deleteOne();
     }
 
     await board.deleteOne();
@@ -129,10 +169,4 @@ const deleteBoard = async (req, res) => {
   }
 };
 
-export {
-  createBoard,
-  getBoards,
-  getBoardById,
-  updateBoard,
-  deleteBoard
-};
+export { createBoard, getBoards, getBoardById, updateBoard, deleteBoard };

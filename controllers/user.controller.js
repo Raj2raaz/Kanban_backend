@@ -1,9 +1,6 @@
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import User from "../models/user.model.js"; // Adjust the path to your model
-
-// Secret key for JWT (store securely in environment variables)
-const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
+import User from "../models/user.model.js"; 
+import { generateAccessToken, generateRefreshToken } from "../utils/jwt.utils.js";
 
 // Register a new user
 export const registerUser = async (req, res) => {
@@ -51,14 +48,15 @@ export const loginUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
-    // Generate a JWT token
-    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, {
-      expiresIn: "1h", // Token expires in 1 hour
-    });
+    // Generate tokens
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
 
     res.status(200).json({
       message: "Login successful",
-      token,
+      accessToken,
+      refreshToken,
+      expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000),  // 12 hours from now
       user: {
         id: user._id,
         username: user.username,
@@ -67,6 +65,7 @@ export const loginUser = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("JWT Error: ", error);
     res.status(500).json({ message: "Error logging in", error: error.message });
   }
 };

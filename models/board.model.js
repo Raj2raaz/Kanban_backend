@@ -10,6 +10,10 @@ const boardSchema = new Schema(
       required: true, // Board name is required
       trim: true, // Removes unnecessary whitespaces
     },
+    description: {
+      type: String,
+      default: "", // Optional description for the board
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User", // References the User model (creator of the board)

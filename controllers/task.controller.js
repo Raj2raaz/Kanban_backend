@@ -99,12 +99,20 @@ const deleteTask = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Find the task by ID
     const task = await Task.findById(id);
     if (!task) {
       return res.status(404).json({ message: "Task not found." });
     }
 
-    await task.remove();
+    // Remove the task reference from the associated column
+    await Column.findByIdAndUpdate(task.columnId, {
+      $pull: { tasks: task._id }
+    });
+
+    // Use deleteOne instead of remove
+    await task.deleteOne();
+
     res.status(200).json({ message: "Task deleted successfully." });
   } catch (error) {
     console.error("Error deleting task:", error.message);

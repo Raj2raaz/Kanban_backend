@@ -1,6 +1,7 @@
 import Column from "../models/column.model.js";
 import Board from "../models/board.model.js";
 import mongoose from "mongoose";
+import Task from "../models/task.model.js";
 
 // Create a new column
 const createColumn = async (req, res) => {
@@ -110,4 +111,35 @@ const updateColumn = async (req, res) => {
   }
 };
 
-export { createColumn, getColumnsByBoard, getColumnById, updateColumn };
+// Delete a column
+const deleteColumn = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the column by ID
+    const column = await Column.findById(id);
+    if (!column) {
+      return res.status(404).json({ message: "Column not found." });
+    }
+
+    // Remove the column from the associated board
+    await Board.findByIdAndUpdate(column.boardId, {
+      $pull: { columns: column._id }
+    });
+
+    // Delete all tasks within the column
+    await Task.deleteMany({ columnId: id });
+
+    // Delete the column itself
+    await column.deleteOne();
+
+    res.status(200).json({ message: "Column and associated tasks deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting column:", error.message);
+    res
+      .status(500)
+      .json({ message: "Failed to delete column.", error: error.message });
+  }
+};
+
+export { createColumn, getColumnsByBoard, getColumnById, updateColumn, deleteColumn };
