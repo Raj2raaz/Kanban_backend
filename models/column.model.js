@@ -18,6 +18,11 @@ const columnSchema = new mongoose.Schema(
         ref: "Task",
       },
     ],
+    color: {
+      type: String,
+      enum: ['red', 'blue', 'green', 'yellow', 'purple'],  // Allowed colors
+      // default: 'blue',  // Default color
+    },
   },
   { timestamps: true }
 );

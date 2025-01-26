@@ -19,4 +19,11 @@ router.put('/:id', authenticate, updateTask);
 // Route for deleting a task
 router.delete('/:id', authenticate, deleteTask);
 
+// Route for updating task order within a column
+// router.put("/", authenticate, updateTaskOrder);
+
+// Route for moving a task to another column
+// router.put("/:taskId/move", authenticate, moveTaskToAnotherColumn);
+
+
 export default router;

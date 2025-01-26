@@ -1,4 +1,3 @@
-// models/task.model.js
 import mongoose from 'mongoose';
 
 const taskSchema = new mongoose.Schema({
@@ -22,6 +21,16 @@ const taskSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Column',  // A task belongs to a column
     required: true,
+  },
+  status: {
+    type: String,
+    enum: ['To Do', 'In Progress', 'Completed'],  // Define allowed status values
+    default: 'To Do',  // Default status for a new task
+  },
+  color: {
+    type: String,
+    enum: ['red', 'blue', 'green', 'yellow', 'purple'],  // Allowed colors
+    default: 'blue',  // Default color
   },
 });
 

@@ -3,6 +3,7 @@ import User from "../models/user.model.js"; // Adjust the path to your User mode
 
 export const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
+  console.log("this is authheader", authHeader);
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ message: "Unauthorized: No token provided" });
